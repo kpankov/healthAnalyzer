@@ -1,0 +1,279 @@
+<!doctype html>
+<html>
+
+    <head>
+        <title>Line Chart</title>
+        <script src="chart/dist/Chart.min.js"></script>
+        <script src="chart/samples/utils.js"></script>
+        <script src="moment.js"></script>
+        <meta charset="utf-8"> 
+        <style>
+            canvas{
+                -moz-user-select: none;
+                -webkit-user-select: none;
+                -ms-user-select: none;
+            }
+        </style>
+    </head>
+
+    <body>
+
+        <style>
+            HTML  CSS  JS Result
+            EDIT ON
+            .input-file-container {
+                position: relative;
+                width: 225px;
+            } 
+            .js .input-file-trigger {
+                display: block;
+                padding: 14px 45px;
+                background: #39D2B4;
+                color: #fff;
+                font-size: 1em;
+                transition: all .4s;
+                cursor: pointer;
+            }
+            .js .input-file {
+                position: absolute;
+                top: 0; left: 0;
+                width: 225px;
+                opacity: 0;
+                padding: 14px 0;
+                cursor: pointer;
+            }
+            .js .input-file:hover + .input-file-trigger,
+            .js .input-file:focus + .input-file-trigger,
+            .js .input-file-trigger:hover,
+            .js .input-file-trigger:focus {
+                background: #34495E;
+                color: #39D2B4;
+            }
+
+            .file-return {
+                margin: 0;
+            }
+            .file-return:not(:empty) {
+                margin: 1em 0;
+            }
+            .js .file-return {
+                font-style: italic;
+                font-size: .9em;
+                font-weight: bold;
+            }
+            .js .file-return:not(:empty):before {
+                content: "Selected file: ";
+                font-style: normal;
+                font-weight: normal;
+            }
+
+            body {
+                font-family: "Open sans", "Segoe UI", "Segoe WP", Helvetica, Arial, sans-serif;
+                color: #7F8C9A;
+                background: #FCFDFD;
+            }
+            h1, h2 {
+                margin-bottom: 5px;
+                font-weight: normal;
+                text-align: center;
+                color:#aaa;
+            }
+            h2 {
+                margin: 5px 0 2em;
+                color: #1ABC9C;
+            }
+            form {
+                width: 225px;
+                margin: 0 auto;
+                text-align:center;
+            }
+            h2 + P {
+                text-align: center;
+            }
+            .txtcenter {
+                margin-top: 4em;
+                font-size: .9em;
+                text-align: center;
+                color: #aaa;
+            }
+            .copy {
+                margin-top: 2em;
+            }
+            .copy a {
+                text-decoration: none;
+                color: #1ABC9C;
+            }
+        </style>
+
+        <h1>healthParser</h1>
+        <h2>Weight analyzer</h2>
+
+        <form action="#">
+            <div class="input-file-container">  
+                <input class="input-file" id="my-file" type="file">
+                <label tabindex="0" for="my-file" class="input-file-trigger">Select a file...</label>
+            </div>
+            <p class="file-return"></p>
+        </form>
+
+        <p class="txtcenter copy">by <a href="https://twitter.com/kspzel">@kspzel</a></p>
+
+        <p class="txtcenter" id="info"></p>
+
+        <form>
+            <table border="0">
+                <tr><th colspan="2">Period:</th></tr>
+                <tr><td style="text-align: right;">From</td><td><input type="date" id="periodFrom"></td></tr>
+                <tr><td style="text-align: right;">To</td><td><input type="date" id="periodTo"></td></tr>
+            </table>
+        </form>
+
+        <div style="width:95%;">
+            <canvas id="canvas" style="visibility: hidden;"></canvas>
+        </div>
+        <br>
+        <br>
+        <script>
+            var dates = [];
+
+            var config = {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                            label: 'Weight',
+                            backgroundColor: window.chartColors.blue,
+                            borderColor: window.chartColors.blue,
+                            data: [],
+                            fill: false,
+                        }]
+                },
+                options: {
+                    responsive: true,
+                    title: {
+                        display: false,
+                        text: 'Weight'
+                    },
+                    tooltips: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    hover: {
+                        mode: 'nearest',
+                        intersect: true
+                    },
+                    scales: {
+                        xAxes: [{
+                                display: true,
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: 'Date'
+                                }
+                            }],
+                        yAxes: [{
+                                display: true,
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: 'Weight'
+                                }
+                            }]
+                    }
+                }
+            };
+
+            ////////////////////////////////////////////////////////////////////
+
+            document.querySelector("html").classList.add('js');
+
+            var fileInput = document.querySelector(".input-file"),
+                    button = document.querySelector(".input-file-trigger"),
+                    the_return = document.querySelector(".file-return");
+
+            button.addEventListener("keydown", function (event) {
+                if (event.keyCode == 13 || event.keyCode == 32) {
+                    fileInput.focus();
+                }
+            });
+            button.addEventListener("click", function (event) {
+                fileInput.focus();
+                return false;
+            });
+            fileInput.addEventListener("change", function (event) {
+                the_return.innerHTML = this.value;
+
+                loadData(fileInput);
+            });
+
+            ////////////////////////////////////////////////////////////////////
+
+            window.onload = function () {
+                var ctx = document.getElementById('canvas').getContext('2d');
+                window.myLine = new Chart(ctx, config);
+            };
+
+            function loadData(fileInput) {
+                var file = fileInput.files[0];
+                var fileURL = URL.createObjectURL(file);
+                var req = new XMLHttpRequest();
+                req.open('GET', fileURL);
+                req.onload = function () {
+                    URL.revokeObjectURL(fileURL);
+                    populateData(fileInput.form, this.responseXML);
+                };
+                req.onerror = function () {
+                    URL.revokeObjectURL(fileURL);
+                    console.log('Error loading XML file.');
+                };
+                req.send();
+            }
+
+            function populateData(form, xmlDoc) {
+                var root = xmlDoc.documentElement;
+
+                var xmlElement = root.querySelector("name");
+                document.getElementById("info").innerHTML = "Person: " + xmlElement.textContent;
+
+                document.getElementById("canvas").style.visibility = "visible";
+                
+                //document.getElementById("info").innerHTML = "Period From =  " + document.getElementById("periodFrom").value;
+
+                var observations = xmlDoc.getElementsByTagName("observation");
+                for (var i = 0; i < observations.length; i++) {
+                    //var observation = observations[i].firstChild.nodeValue;
+                    var code = observations[i].getElementsByTagName("code")[0].getAttribute("displayName");
+                    var date = observations[i].getElementsByTagName("low")[0].getAttribute("value");
+                    var value = observations[i].getElementsByTagName("value")[0].textContent;
+
+                    /*let tableRef = document.getElementById("weightTable");
+                     let newRow = tableRef.insertRow(-1);
+                     let typeCell = newRow.insertCell(0);
+                     let dateCell = newRow.insertCell(1);
+                     let valueCell = newRow.insertCell(2);
+                     var typeText = document.createTextNode(code);
+                     var dateText = document.createTextNode(date);
+                     var valueText = document.createTextNode(value);
+                     typeCell.appendChild(typeText);
+                     dateCell.appendChild(dateText);
+                     valueCell.appendChild(valueText);*/
+
+                    if (code == "Body weight Measured") {
+                        dates.push(date);
+
+                        if (config.data.datasets.length > 0) {
+                            config.data.labels.push(moment(date, "YYYYMMDDHHmmssZZ").format("YY/MM/DD"));
+                            config.data.datasets.forEach(function (dataset) {
+                                dataset.data.push(value);
+                            });
+                            window.myLine.update();
+                        }
+                    }
+                }
+                /*for () {
+                 //
+                 }*/
+
+            }
+        </script>
+    </body>
+
+</html>
